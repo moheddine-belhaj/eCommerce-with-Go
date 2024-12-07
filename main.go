@@ -14,20 +14,24 @@ import (
 func main(){
 	port := os.Getenv("PORT")
 	if port == ""{
-		port = "8002"
+		port = "8000"
 	}
 	app := controllers.NewApplication(database.ProductData(database.Client,"Products"), database.UserData(database.Client,"Users"))
-	routers := gin.New()
+	router := gin.New()
 
-	routers.Use(gin.Logger())
+	router.Use(gin.Logger())
 
-	router.UserRoutes(router)
-	router.Use(middleware.Authentifcation())
-
+	routes.UserRoutes(router)
+	router.Use(middleware.Authentication())
 	router.GET("/addtocart",app.AddToCart())
-	router.GET("reomveitem",app.RomoveItem())
-	router.GET("cartcheckout",app.BuyFromCart())
-	router.GET("/instanbuy",app.instanBuy())
+	router.GET("/reomveitem",app.RemoveItem())	
+	router.GET("/cartcheckout",app.BuyFromCart())
+	router.GET("/instanbuy",app.InstantBuy())
+	router.POST("/addaddress", controllers.AddAddress())
+	router.PUT("/edithomeaddress", controllers.EditHomeAddress())
+	router.PUT("/editworkaddress", controllers.EditWorkAddress())
+	router.GET("/deleteaddresses", controllers.DeleteAddress())
+	router.GET("/listcart", controllers.GetItemFromCart())
 
-	log.Fatal((router.run(":" + port)))
+	log.Fatal((router.Run(":" + port)))
 }
