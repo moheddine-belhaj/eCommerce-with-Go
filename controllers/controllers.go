@@ -65,11 +65,12 @@ func SignUp() gin.HandlerFunc {
 
 		if err != nil {
 			log.Panic(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "use already exist"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "user already exist"})
 		}
 
 		if count > 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "user alert"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "user already exist"})
+			return
 		}
 
 		count, err = UserCollection.CountDocuments(ctx, bson.M{"phone ": user.Phone})
@@ -141,6 +142,7 @@ func Login() gin.HandlerFunc {
 	}
 
 }
+
 
 func ProductViewAdmin() gin.HandlerFunc {
 
