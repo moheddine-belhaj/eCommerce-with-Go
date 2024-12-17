@@ -2,8 +2,11 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"time"
 
@@ -275,5 +278,55 @@ func GetAll() gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"users": users})
+	}
+}
+
+func AddProductsFromFile(filename string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
+
+		// Open the JSON file
+		file, err := os.Open(filename)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to open file: %v", err)})
+			return
+		}
+		defer file.Close()
+
+		// Read the file content
+		fileContent, err := io.ReadAll(file)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to read file: %v", err)})
+			return
+		}
+
+		// Unmarshal JSON data into a slice of Product structs
+		var products []models.Product
+		if err := json.Unmarshal(fileContent, &products); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to unmarshal JSON: %v", err)})
+			return
+		}
+
+		// Loop through the products and insert them into the database
+		for _, product := range products {
+			newProduct := models.Product{
+				Product_ID:   primitive.NewObjectID(),
+				Product_Name: product.Product_Name,
+				Price:        product.Price,
+				Rating:       product.Rating,
+				Image:        product.Image,
+			}
+
+			// Insert the product into the database
+			_, err := ProductCollection.InsertOne(ctx, newProduct)
+			if err != nil {
+				log.Printf("Failed to insert product: %v", err)
+				continue // Skip this product and proceed with the next one
+			}
+		}
+
+		// Send response indicating that products were successfully added
+		c.JSON(http.StatusOK, gin.H{"message": "Successfully added products from file to database"})
 	}
 }
