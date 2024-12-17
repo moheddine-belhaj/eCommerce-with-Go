@@ -1,0 +1,20 @@
+[
+    {
+      "product_name": "Product 1",
+      "price": 150,
+      "rating": 5,
+      "image": "https://example.com/product1.jpg"
+    },
+    {
+      "product_name": "Product 2",
+      "price": 100,
+      "rating": 4,
+      "image": "https://example.com/product2.jpg"
+    },
+    {
+      "product_name": "Product 3",
+      "price": 200,
+      "rating": 3,
+      "image": "https://example.com/product3.jpg"
+    }
+]
