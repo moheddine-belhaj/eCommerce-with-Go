@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"regexp"
 	"time"
 
 	"fmt"
@@ -22,6 +23,13 @@ import (
 var Validate = validator.New()
 var UserCollection *mongo.Collection = database.UserData(database.Client, "Users")
 var ProductCollection *mongo.Collection = database.ProductData(database.Client, "Products")
+
+func isValidPhoneNumber(phone string) bool {
+
+	re := regexp.MustCompile(`^\d{11}$`)
+	return re.MatchString(phone)
+}
+
 
 func HashPassword(password string) string {
 
@@ -58,22 +66,27 @@ func SignUp() gin.HandlerFunc {
 		}
 		ValidateErr := Validate.Struct(user)
 		if ValidateErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error:": ValidateErr})
+			c.JSON(http.StatusBadRequest, gin.H{"error:": "missing inforamtion"})
+			return
+		}
+
+		if !isValidPhoneNumber(*user.Phone) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid phone number. It must contain only digits and be 10 digits long."})
 			return
 		}
 		count, err := UserCollection.CountDocuments(ctx, bson.M{"email": user.Email})
 
 		if err != nil {
 			log.Panic(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "user already exist"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		}
 
 		if count > 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "user already exist"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Email already used"})
 			return
 		}
 
-		count, err = UserCollection.CountDocuments(ctx, bson.M{"phone ": user.Phone})
+		count2, err := UserCollection.CountDocuments(ctx, bson.M{"phone": user.Phone})
 
 		defer cancel()
 		if err != nil {
@@ -81,9 +94,8 @@ func SignUp() gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 			return
 		}
-
-		if count > 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "this phone "})
+		if count2 > 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "this phone already used"})
 			return
 		}
 		password := HashPassword(*user.Password)
@@ -137,12 +149,11 @@ func Login() gin.HandlerFunc {
 		token, refreshToken, _ := generate.TokenGenerator(*founduser.Email, *founduser.First_Name, *founduser.Last_Name, founduser.User_ID)
 		defer cancel()
 		generate.UpdateAllTokens(token, refreshToken, founduser.User_ID)
-		c.JSON(http.StatusFound, founduser)
+		c.JSON(http.StatusOK, founduser)
 
 	}
 
 }
-
 
 func ProductViewAdmin() gin.HandlerFunc {
 
@@ -237,4 +248,32 @@ func SearchProductByQuerry() gin.HandlerFunc {
 		c.IndentedJSON(200, searchproducts)
 	}
 
+}
+
+func GetAll() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
+		cursor, err := UserCollection.Find(ctx, bson.M{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching users"})
+			return
+		}
+		defer cursor.Close(ctx)
+
+		var users []models.User
+		for cursor.Next(ctx) {
+			var user models.User
+			if err := cursor.Decode(&user); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error decoding user data"})
+				return
+			}
+			users = append(users, user)
+		}
+		if err := cursor.Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error iterating over users"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"users": users})
+	}
 }
